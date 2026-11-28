@@ -1,101 +1,60 @@
-// Copyright (C) 2024 Advanced Micro Devices, Inc
-//
-// SPDX-License-Identifier: MIT
-
 #include <iostream>
-#include <stdlib.h>
-#include <time.h>
 #include "mmult_baseline.h"
 
-#ifdef __SDSCC__
-#include "sds_lib.h"
-#else
-#define sds_alloc malloc
-#define sds_free free
-#endif
-
-#ifndef NUM_TIMES
-#define NUM_TIMES 2
-#endif
+#include <ap_int.h>
+#include <ap_fixed.h>
 
 
-void mmult_sw( int *in1,   // Input matrix 1
-               int *in2,   // Input matrix 2
-               int *out,   // Output matrix (out = A x B)
-               int dim     // Matrix size of one dimension
-             )
+
+int main()
 {
-    //Performs matrix multiplication out = in1 x in2
-    for (int i = 0; i < dim; i++){
-        for (int j = 0; j < dim; j++){
-            for (int k = 0; k < dim; k++){
-                out[i * dim + j] += in1[i * dim + k] * in2[k * dim  + j];
-            }
-        }
-    }
-}
+    LidarPointPacket packet;
 
+    packet.point_num = 300;
 
-int main(int argc, char** argv)
-{
-    int dim =  DATA_SIZE;
-    size_t matrix_size_bytes = sizeof(int) * DATA_SIZE * DATA_SIZE;
-    //Allocate memory
-    //malloc() doesn't guarantee contiguous physical memory allocation, but for
-    //the hardware to implement the function using simple DMA, it requires
-    //allocation of contiguous physical memory which can be done using sds_alloc().
-    int *in1 = (int *) sds_alloc(matrix_size_bytes);
-    int *in2 = (int *) sds_alloc(matrix_size_bytes);
-    int *hw_result = (int *) sds_alloc(matrix_size_bytes);
-    int *sw_result = (int *) malloc(matrix_size_bytes);
+    packet.angle_min = 0.0;
+    packet.angle_increment = 0.010472;
 
-    if( (in1 == NULL) || (in2 == NULL) || (sw_result == NULL) || (hw_result == NULL) )
-        {
-            std::cout << "TEST FAILED : Failed to allocate memory" << std::endl;
-            return -1;
-        }
+    packet.horizontal_start = 1.75192;
+    packet.horizontal_step = 0.000211152;
 
-    bool match = true;
+    packet.scan_period = 0.004618;
 
-    for (int i = 0; i < NUM_TIMES; i++)
+    packet.range_min = 0.0;
+    packet.range_max = 40.0;
+
+    packet.a_axis_dist = 0.0445;
+    packet.b_axis_dist = 0.006586;
+
+    packet.theta_angle_bias = 2.0769;
+    packet.alpha_angle_bias = 0.00829031;
+
+    packet.beta_angle = -0.00610865;
+    packet.xi_angle = -0.00523599;
+
+    packet.range_bias = -302.812;
+    packet.range_scale = 0.000978692;
+
+    for(int i=0;i<300;i++)
     {
-        //Create test data
-        for (int i = 0; i < dim * dim; i++) {
-            in1[i] = rand() % dim;
-            in2[i] = rand() % dim;
-            sw_result[i] = 0;
-            hw_result[i] = 0;
-        }
-
-        //Launch the software solution
-        mmult_sw( in1, in2, sw_result, dim);
-
-        //Launch the Hardware solution
-        mmult_hw( in1, in2, hw_result, dim);
-
-        //Compare the results of hardware to the software
-        for(int i=0; i< dim * dim; i++)
-        {
-            if( sw_result[i] != hw_result[i] )
-            {
-                std::cout << "Results Mismatch on " << "Row:" << i/dim << "Col:" << i - (i/dim)*dim << std::endl;
-                std::cout << "CPU output:" << sw_result[i] <<"\t Hardware output:" << hw_result[i] << std::endl;
-                match = false;
-                break;
-            }
-        }
+        packet.ranges[i] = 2000;
+        packet.intensities[i] = 80;
     }
 
-    //Release Memory
-    sds_free(in1);
-    sds_free(in2);
-    sds_free(hw_result);
-    free(sw_result);
+    PointXYZI cloud[300];
 
-    std::cout << " TEST " << (match? "PASSED": "FAILED") << std::endl;
-    return(match? EXIT_SUCCESS: EXIT_FAILURE);
+    mmult_hw(
+        &packet,
+        cloud
+    );
+
+    for(int i=0;i<10;i++)
+    {
+        std::cout
+            << cloud[i].x << " "
+            << cloud[i].y << " "
+            << cloud[i].z << std::endl;
+    }
+
+    return 0;
 }
-
-
-
-
